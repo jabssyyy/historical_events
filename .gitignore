@@ -1,0 +1,18 @@
+# Dependencies (rebuildable from package.json — never commit)
+**/node_modules/
+
+# Secrets — API keys live here, never in version control
+**/.env
+.env
+
+# Build output
+**/dist/
+
+# Logs / OS cruft
+*.log
+.DS_Store
+
+# Internal working docs — keep local, never publish (all root .md except README)
+/*.md
+!README.md
+server/test-request.json
