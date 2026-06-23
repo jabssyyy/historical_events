@@ -1,92 +1,123 @@
 # What-If Engine
 
-An **interrogatable alternate-history engine**. Pick a famous historical event, see what really happened, then ask your own *"what if"* questions. Each question grows a **named branch** on a timeline; follow-ups grow **sub-branches** — building a tree you explore, a world you interrogate rather than a one-shot essay.
+Pick a famous historical event, see what actually happened, then ask your own
+"what if" questions. Each question adds a named branch to a timeline, and
+follow-up questions branch off those, so you end up with a tree of alternate
+histories you can explore instead of a single block of text.
 
-## Why it's different
+The current build ships one scenario: Gandhi surviving Godse's 1948
+assassination attempt.
 
-It beats typing a what-if into a generic chatbot in three ways:
+## The idea
 
-1. **Structured, branching output** — a tree of named branches, not a wall of prose.
-2. **Internal consistency** — the alternate world never contradicts itself, however deep you dig.
-3. **Honest confidence** — every branch reports how confident it is, and uncertainty grows the further a consequence sits from the point of divergence.
+Typing a what-if into a normal chatbot gives you one essay and no memory. This
+tries to do better in three ways:
 
-## How it works
+1. The output is a tree of named branches, not a wall of prose.
+2. The alternate world stays consistent. Dig deeper and it won't contradict
+   things it already established.
+3. Confidence is shown honestly. The further a consequence sits from the moment
+   history diverged, the lower the confidence on that branch.
 
-There is **no history database** — the language model's own knowledge is the data. The cleverness is in how consistency is enforced:
+## How consistency works
 
-- Every node stores the **new facts** its branch makes true (e.g. *"Gandhi alive past 1948"*).
-- When you ask a follow-up on any node, the app walks **up** the tree, collects every ancestor's facts, and injects them back into the prompt as *established facts*.
-- Because the model is always handed everything already true higher up the tree, it **cannot contradict the world already built**.
+There is no history database. The model's own training knowledge is the data.
+The interesting part is how the app stops the model contradicting itself.
 
-It's plain state-passing — collect facts, pass them to the next prompt — not retrieval-augmented generation.
-
-```
-[ Real-history anchor ]  +  [ Established facts from ancestors ]  +  [ Your question ]
-                                   → model → one structured branch
-```
-
-## Tech stack
-
-| Layer    | Tech                                   |
-|----------|----------------------------------------|
-| Frontend | React + Vite                           |
-| Backend  | Node.js + Express (stateless, one API) |
-| Model    | Provider-agnostic — any OpenAI-compatible chat-completions endpoint |
-
-The backend exists only to **keep the API key off the browser** and to **validate the model's JSON** before it reaches the UI. The client owns the tree; the server is stateless.
-
-## Project structure
+Every node records the new facts its branch makes true, for example "Gandhi is
+alive past 1948". When you ask a follow-up on a node, the app walks up the tree
+to the root, gathers every ancestor's facts, and feeds them back into the next
+prompt as established facts. Since the model always receives everything already
+true higher up the tree, it has no room to deny it.
 
 ```
-client/                 # React + Vite app (owns the tree, renders branches)
+real-history anchor  +  established facts from ancestors  +  your question
+                              -> model -> one structured branch
+```
+
+This is plain state-passing (collect facts, pass them along), not
+retrieval-augmented generation.
+
+## Stack
+
+- Frontend: React + Vite. The branching timeline is hand-built SVG; the
+  background particle layer is a canvas element; panel animations use
+  framer-motion; tree layout uses d3-hierarchy and d3-shape.
+- Backend: Node.js + Express, stateless, one endpoint (`POST /api/generate`).
+- Model: any OpenAI-compatible chat-completions endpoint.
+
+The server only exists to keep the API key out of the browser and to validate
+the model's JSON before it reaches the UI. The client holds the whole tree in
+React state; the server never stores anything between requests.
+
+## Project layout
+
+```
+client/
   src/
-    components/          # EventHeader, NodeCard, QuestionInput
-    lib/                 # tree.js (fact-inheritance), api.js
-    data/                # the seed event
-server/                 # Express backend
+    App.jsx              tree state, the ask handler, layout of the page
+    components/
+      Timeline.jsx       SVG timeline: the real-history beam and branch tendrils
+      EnergyField.jsx    canvas background (particles, glow)
+      DetailPanel.jsx    selected-node panel: facts, confidence, ask box
+      QuestionInput.jsx  the what-if input
+    lib/
+      tree.js            fact inheritance, depth, immutable node insert
+      layout.js          turns the flat node map into positioned nodes + links
+      api.js             wrapper around POST /api/generate
+    data/
+      events.js          the seed event and the real timeline
+server/
   src/
-    index.js             # POST /api/generate
-    prompt.js            # system prompt + prompt assembly
-    llm.js               # provider-agnostic LLM call
-    validate.js          # JSON validation + one retry
+    index.js             Express app and the /api/generate route
+    prompt.js            system prompt and prompt assembly
+    llm.js               the provider-agnostic model call
+    validate.js          JSON validation with one retry
 ```
 
-## Getting started
+## Running it locally
 
-**Prerequisites:** Node.js 18+ and an API key for any OpenAI-compatible model provider.
+You need Node.js 18+ and an API key for any OpenAI-compatible model provider.
 
 ```bash
-# 1. Backend
+# backend
 cd server
 npm install
-cp .env.example .env        # then fill in the LLM_* values (see below)
-npm run dev                 # starts on http://localhost:3001
+cp .env.example .env     # fill in the LLM_* values below
+npm run dev              # http://localhost:3001
 
-# 2. Frontend (in a second terminal)
+# frontend, in a second terminal
 cd client
 npm install
-npm run dev                 # open the printed local URL
+npm run dev              # open the URL it prints
 ```
 
-The Vite dev server proxies `/api` to the backend, so the frontend just calls a relative `/api/generate`.
+Vite proxies `/api` to the backend, so the frontend just calls `/api/generate`.
 
-### Environment variables (`server/.env`)
+### server/.env
 
 ```
 LLM_API_KEY=    # your provider key
 LLM_BASE_URL=   # any OpenAI-compatible endpoint
-LLM_MODEL=      # the model id to use
+LLM_MODEL=      # the model id
 PORT=3001
 ```
 
-Because it targets the OpenAI-compatible shape, you can point it at a range of providers (e.g. Groq, Gemini's compatibility endpoint, or a local Ollama) by changing only these three values — no code changes. The key is read on the server only and never reaches the browser.
+Switching providers (Groq, Gemini's OpenAI-compatible endpoint, a local Ollama,
+and so on) is just a matter of changing those three values. No code changes. The
+key is read on the server only and never reaches the browser.
 
-## Roadmap
+## Status
 
-- **Phase 0 — the engine** ✅ Branching tree, fact-inheritance consistency, honest confidence, plain card UI.
-- **Phase 1 — the visual** A cinematic branching-timeline view with an animated detail panel, reading the same node data.
-- **Later** More curated events, a world-map of consequences, retrieval to go beyond famous events, and shareable timelines.
+- Phase 0, the engine: done. Branching tree, the fact-inheritance consistency
+  mechanism, honest confidence, JSON validation with retry.
+- Phase 1, the visual: done. The card list is replaced by an animated branching
+  timeline modelled on the "sacred timeline" look, with a slide-up detail panel.
+  Same node data underneath; the engine did not change.
+
+Possible next steps: more curated events, a consequence map, retrieval so it can
+handle events the model knows less well, and shareable timelines.
 
 ## License
 
-To be decided by the project owner.
+Not decided yet.
