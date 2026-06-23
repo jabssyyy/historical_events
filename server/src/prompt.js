@@ -27,7 +27,7 @@ HARD RULES:
 - Output ONLY valid JSON matching the schema below. No markdown, no code fences, no preamble, no trailing text.
 - Stay internally consistent: every ESTABLISHED FACT remains true. If a question would contradict one, reason AROUND it — never break it.
 - Do NOT fabricate precise specifics (exact dates, treaty names, invented quotes) as if certain. When speculating, hedge in the description with "likely", "could", "may have".
-- confidence: 0.0–1.0, honest. Near-term/plausible consequences score higher; distant/speculative score lower. Low confidence deep in a chain is expected and correct.
+- confidence: 0.0–1.0, honest, and it MUST DECAY with distance from the divergence. Rough guide: a first divergence from real history ≈ 0.6–0.8; a few steps deep ≈ 0.4–0.6; many established facts deep ≈ 0.2–0.4. Each layer of speculation compounds uncertainty — do NOT let confidence drift upward as the chain grows. Low confidence deep in a chain is expected and correct.
 - branchName: 2–5 word evocative title (e.g. "The Living Mahatma", "The Unbroken Raj").
 - newFacts: 1–3 NEW short declarative facts this branch makes true in the alternate world. These will be inherited by future questions, so make them clean and reusable.
 - butterflies: 1–3 specific named downstream ripple effects.
@@ -50,16 +50,26 @@ OUTPUT SCHEMA (return EXACTLY this shape, nothing else):
 // a blank — an empty section reads to the model as "no constraints", which is
 // exactly true for the first divergence but worth stating plainly.
 export function buildUserPrompt({ anchor, inheritedFacts, question }) {
+  const count = (inheritedFacts && inheritedFacts.length) || 0;
   const facts =
-    inheritedFacts && inheritedFacts.length
+    count > 0
       ? inheritedFacts.map((f) => `- ${f}`).join("\n")
       : "None yet — this is the first divergence from real history.";
+
+  // Tell the model how deep into speculation this branch sits, so confidence
+  // decays honestly the further it is from real history.
+  const depthNote =
+    count === 0
+      ? "This is the FIRST divergence from real history — consequences are relatively near-term, so confidence may be moderate-to-high."
+      : `This branch sits atop ${count} established fact(s) of accumulated speculation — it is several steps removed from real history, so keep confidence HONEST and LOWER than a first divergence.`;
 
   return `FACTUAL ANCHOR (real history — never deny as real):
 ${anchor}
 
 ESTABLISHED FACTS (already true in this alternate timeline — never contradict, build on these):
 ${facts}
+
+${depthNote}
 
 QUESTION:
 ${question}

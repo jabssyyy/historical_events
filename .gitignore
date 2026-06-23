@@ -12,6 +12,9 @@
 *.log
 .DS_Store
 
+# Local tooling config — keep out of the public repo
+.claude/
+
 # Internal working docs — keep local, never publish (all root .md except README)
 /*.md
 !README.md
